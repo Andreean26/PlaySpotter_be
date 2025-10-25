@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: playspotter_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: playspotter
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - playspotter_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: playspotter_api
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${PORT:-8080}/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - playspotter_network
+
+  adminer:
+    image: adminer:latest
+    container_name: playspotter_adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+    networks:
+      - playspotter_network
+
+volumes:
+  pgdata:
+
+networks:
+  playspotter_network:
+    driver: bridge
